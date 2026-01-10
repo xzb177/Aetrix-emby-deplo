@@ -1,0 +1,218 @@
+# RoyalBot Emby Portal - Production Deployment
+# 官方一键部署配置
+# 文档: https://github.com/your-org/royalbot-emby-deploy
+
+version: '3.8'
+
+services:
+  # ==================== PostgreSQL Database ====================
+  postgres:
+    image: postgres:15-alpine
+    container_name: royalbot_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: royalbot
+      POSTGRES_USER: royalbot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: Asia/Shanghai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U royalbot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Redis Cache ====================
+  redis:
+    image: redis:7-alpine
+    container_name: royalbot_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== User Backend API ====================
+  user_backend:
+    image: ${REGISTRY:-ghcr.io/royalbot}/royalbot-user-backend:${IMAGE_TAG:-latest}
+    container_name: royalbot_user_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://royalbot:${POSTGRES_PASSWORD}@postgres:5432/royalbot
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_ENABLED: "true"
+      SECRET_KEY: ${JWT_SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 240
+      DEBUG: ${DEBUG:-False}
+      FRONTEND_URL: ${FRONTEND_URL:-https://login.laodaemby.xyz}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      YIPAY_GATEWAY_URL: ${YIPAY_GATEWAY_URL}
+      YIPAY_PARTNER_ID: ${YIPAY_PARTNER_ID}
+      YIPAY_KEY: ${YIPAY_KEY}
+      CRON_SECRET: ${CRON_SECRET}
+      CRYPTO_KEY: ${CRYPTO_KEY}
+      TZ: Asia/Shanghai
+    volumes:
+      - user_backend_logs:/app/logs
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Admin Backend API ====================
+  admin_backend:
+    image: ${REGISTRY:-ghcr.io/royalbot}/royalbot-admin-backend:${IMAGE_TAG:-latest}
+    container_name: royalbot_admin_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://royalbot:${POSTGRES_PASSWORD}@postgres:5432/royalbot
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      REDIS_ENABLED: "true"
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD}
+      SECRET_KEY: ${JWT_SECRET_KEY}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 240
+      DEBUG: ${DEBUG:-False}
+      FRONTEND_URL: ${FRONTEND_URL:-https://login.laodaemby.xyz}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      MAIN_DB_PATH: /app/data/royalbot.db
+      TZ: Asia/Shanghai
+    volumes:
+      - admin_backend_logs:/app/logs
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== User Frontend ====================
+  user_frontend:
+    image: ${REGISTRY:-ghcr.io/royalbot}/royalbot-user-frontend:${IMAGE_TAG:-latest}
+    container_name: royalbot_user_frontend
+    restart: unless-stopped
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Admin Frontend ====================
+  admin_frontend:
+    image: ${REGISTRY:-ghcr.io/royalbot}/royalbot-admin-frontend:${IMAGE_TAG:-latest}
+    container_name: royalbot_admin_frontend
+    restart: unless-stopped
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==================== Nginx Reverse Proxy ====================
+  nginx:
+    image: nginx:alpine
+    container_name: royalbot_nginx
+    restart: unless-stopped
+    command: ["/bin/sh", "-c", "rm -f /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - user_backend
+      - admin_backend
+      - user_frontend
+      - admin_frontend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - royalbot_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  user_backend_logs:
+    driver: local
+  admin_backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  royalbot_network:
+    driver: bridge

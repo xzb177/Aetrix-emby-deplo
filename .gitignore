@@ -1,0 +1,19 @@
+# Environment
+.env
+
+# SSL Certificates
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+nginx/ssl/
+
+# Backups
+*.sql
+*.sql.gz
+backups/
+
+# Logs
+*.log
+
+# Docker Data
+data/

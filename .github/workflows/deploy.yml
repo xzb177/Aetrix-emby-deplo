@@ -1,0 +1,44 @@
+name: RoyalBot Emby - Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.yml'
+      - 'nginx/**'
+      - 'scripts/**'
+      - '.env.example'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io/royalbot
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          script: |
+            cd /root/royalbot-emby-deploy
+            git pull origin main
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
+
+      - name: Health Check
+        run: |
+          sleep 30
+          curl -f ${{ secrets.APP_URL }}/health || exit 1
+
+      - name: Notify
+        if: always()
+        run: |
+          echo "部署状态: ${{ job.status }}"
