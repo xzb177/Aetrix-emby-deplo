@@ -60,7 +60,7 @@ services:
 
   # ==================== User Backend API ====================
   user_backend:
-    image: ${REGISTRY:-ghcr.io/royalbot}/royalbot-user-backend:${IMAGE_TAG:-latest}
+    image: royalbot-portal-user_backend:latest
     container_name: royalbot_user_backend
     restart: unless-stopped
     environment:

@@ -1,19 +1,9 @@
-# Environment
+# 前端构建产物（从源码构建）
+user_frontend_dist/
+admin_frontend_dist/
+
+# 环境变量（包含敏感信息）
 .env
 
-# SSL Certificates
-nginx/ssl/*.pem
-nginx/ssl/*.key
-nginx/ssl/*.crt
-nginx/ssl/
-
-# Backups
-*.sql
-*.sql.gz
-backups/
-
-# Logs
+# 日志
 *.log
-
-# Docker Data
-data/
