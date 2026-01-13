@@ -72,6 +72,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 240
       DEBUG: ${DEBUG:-False}
       FRONTEND_URL: ${FRONTEND_URL:-https://login.laodaemby.xyz}
+      ADMIN_BACKEND_URL: http://admin_backend:8080
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       YIPAY_GATEWAY_URL: ${YIPAY_GATEWAY_URL}
       YIPAY_PARTNER_ID: ${YIPAY_PARTNER_ID}
@@ -117,6 +118,7 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 240
       DEBUG: ${DEBUG:-False}
       FRONTEND_URL: ${FRONTEND_URL:-https://login.laodaemby.xyz}
+      FRONTEND_URLS: '["${FRONTEND_URL:-https://login.laodaemby.xyz}"]'
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       MAIN_DB_PATH: /app/data/royalbot.db
       TZ: Asia/Shanghai
