@@ -37,7 +37,7 @@ services:
     image: redis:7-alpine
     container_name: royalbot_redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --aof-use-rdb-preamble yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
     environment:
       TZ: Asia/Shanghai
     volumes:
